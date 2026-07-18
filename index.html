@@ -1,269 +1,191 @@
-// ==========================================
-// BACKEND API REST - SUMERCE ALIMENTOS S.A.S.
-// DataPulse Suite Pro - Google Apps Script
-// ==========================================
+# Let's generate a README text file or instructions package to make it extremely easy for the student to follow.
+# Actually, the user wants help with the code to place it and create a web page with GitHub (GitHub Pages).
+# We will create a step-by-step PDF manual on how to publish DataPulse Suite Pro on GitHub Pages using their HTML file, 
+# along with explanations on how to wire it up with the Google Apps Script backend.
 
-function doPost(e) {
-  try {
-    var requestData = JSON.parse(e.postData.contents);
-    var action = requestData.action;
-    var idUsuario = requestData.idUsuario || "General_User";
-    var correo = requestData.correo || "";
-    
-    // Inicializar las hojas base si no existen en el Google Sheet
-    inicializarBaseDeDatos();
-    
-    var response;
-    
-    switch (action) {
-      case 'login':
-        response = ejecutarLogin(idUsuario, correo);
-        break;
-      case 'obtenerDatosDashboard':
-        response = obtenerDatosDashboard(idUsuario);
-        break;
-      case 'guardarOrganizacion':
-        response = guardarOrganizacion(idUsuario, requestData.orgData);
-        break;
-      case 'crearProducto':
-        response = crearProducto(idUsuario, requestData.producto);
-        break;
-      case 'crearVendedor':
-        response = crearVendedor(idUsuario, requestData.vendedor);
-        break;
-      case 'registrarVenta':
-        response = registrarVenta(idUsuario, requestData.venta);
-        break;
-      case 'guardarObjetivo':
-        response = guardarObjetivo(idUsuario, requestData.objetivo);
-        break;
-      case 'actualizarAvanceOKR':
-        response = actualizarAvanceOKR(idUsuario, requestData.idObjetivo, requestData.nuevoActual);
-        break;
-      case 'guardarConfig':
-        response = guardarConfig(idUsuario, requestData.mistralKey);
-        break;
-      default:
-        throw new Error("Acción no reconocida en el backend.");
+import os
+from weasyprint import HTML
+
+html_content = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    @page {
+        size: A4;
+        margin: 18mm 15mm;
+        background-color: #ffffff;
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+            font-size: 8pt;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #6c757d;
+        }
     }
-    
-    return ContentService.createTextOutput(JSON.stringify({ success: true, data: response }))
-                         .setMimeType(ContentService.MimeType.JSON);
-                         
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
-                         .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// === FUNCIONES OPERATIVAS ===
-
-function inicializarBaseDeDatos() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hojasRequeridas = ["organizacion", "productos", "vendedores", "ventas", "objetivos", "configuracion"];
-  
-  hojasRequeridas.forEach(function(nombreHoja) {
-    var hoja = ss.getSheetByName(nombreHoja);
-    if (!hoja) {
-      hoja = ss.insertSheet(nombreHoja);
-      // Agregar encabezados según corresponda
-      if (nombreHoja === "organizacion") {
-        hoja.appendRow(["idUsuario", "nombreEmpresa", "nit", "tamano", "sector", "dofa_f", "dofa_o", "dofa_d", "dofa_a", "pestel_pe", "pestel_ec", "pestel_so", "pestel_te", "pestel_eco", "pestel_le"]);
-      } else if (nombreHoja === "productos") {
-        hoja.appendRow(["idUsuario", "nombre", "stockInicial", "precio"]);
-      } else if (nombreHoja === "vendedores") {
-        hoja.appendRow(["idUsuario", "nombre", "zona"]);
-      } else if (nombreHoja === "ventas") {
-        hoja.appendRow(["idUsuario", "idVenta", "fecha", "producto", "cantidad", "monto", "vendedor", "ubicacion"]);
-      } else if (nombreHoja === "objetivos") {
-        hoja.appendRow(["idUsuario", "idObjetivo", "objetivo", "descripcion", "meta", "actual"]);
-      } else if (nombreHoja === "configuracion") {
-        hoja.appendRow(["idUsuario", "mistralKey"]);
-      }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 10pt;
+        line-height: 1.6;
+        color: #2D3748;
+        margin: 0;
+        padding: 0;
     }
-  });
-}
-
-function ejecutarLogin(idUsuario, correo) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hojaOrg = ss.getSheetByName("organizacion");
-  var datos = hojaOrg.getDataRange().getValues();
-  
-  var organizacion = null;
-  var esNuevo = true;
-  
-  for (var i = 1; i < datos.length; i++) {
-    if (datos[i][0] == idUsuario) {
-      esNuevo = false;
-      organizacion = {
-        nombreEmpresa: datos[i][1],
-        nit: datos[i][2],
-        tamaño: datos[i][3],
-        sector: datos[i][4],
-        dofa: { f: datos[i][5], o: datos[i][6], d: datos[i][7], a: datos[i][8] },
-        pestel: { pe: datos[i][9], ec: datos[i][10], so: datos[i][11], te: datos[i][12], eco: datos[i][13], le: datos[i][14] }
-      };
-      break;
+    .header-banner {
+        background-color: #0d1117;
+        color: #ffffff;
+        padding: 25px;
+        margin: -18mm -15mm 25px -15mm;
+        border-bottom: 4px solid #238636;
     }
-  }
-  
-  return { idUsuario: idUsuario, esNuevo: esNuevo, organizacion: organizacion };
-}
-
-function obtenerDatosDashboard(idUsuario) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // 1. Obtener Organización
-  var hojaOrg = ss.getSheetByName("organizacion");
-  var dOrg = hojaOrg.getDataRange().getValues();
-  var organizacion = {};
-  for(var i=1; i<dOrg.length; i++){
-    if(dOrg[i][0] == idUsuario){
-      organizacion = {
-        nombreEmpresa: dOrg[i][1], nit: dOrg[i][2], tamaño: dOrg[i][3], sector: dOrg[i][4],
-        dofa: { f: dOrg[i][5], o: dOrg[i][6], d: dOrg[i][7], a: dOrg[i][8] },
-        pestel: { pe: dOrg[i][9], ec: dOrg[i][10], so: dOrg[i][11], te: dOrg[i][12], eco: dOrg[i][13], le: dOrg[i][14] }
-      };
+    .header-banner h1 {
+        margin: 0;
+        font-size: 18pt;
+        font-weight: 600;
+        letter-spacing: -0.5px;
     }
-  }
-  
-  // 2. Obtener Ventas Recientes
-  var hojaVentas = ss.getSheetByName("ventas");
-  var dVentas = hojaVentas.getDataRange().getValues();
-  var ventas = [];
-  for(var i=dVentas.length-1; i>=1; i--) { // De más recientes a más antiguas
-    if(dVentas[i][0] == idUsuario) {
-      ventas.push({ id: dVentas[i][1], fecha: dVentas[i][2], producto: dVentas[i][3], cantidad: Number(dVentas[i][4]), monto: Number(dVentas[i][5]), vendedor: dVentas[i][6], ubicacion: dVentas[i][7] });
+    .header-banner p {
+        margin: 5px 0 0 0;
+        font-size: 10pt;
+        color: #8b949e;
     }
-  }
-  
-  // 3. Obtener Vendedores
-  var hojaVend = ss.getSheetByName("vendedores");
-  var dVend = hojaVend.getDataRange().getValues();
-  var vendedores = [];
-  for(var i=1; i<dVend.length; i++) {
-    if(dVend[i][0] == idUsuario) {
-      vendedores.push({ nombre: dVend[i][1], zona: dVend[i][2] });
+    h2 {
+        font-size: 13pt;
+        color: #0d1117;
+        border-left: 4px solid #238636;
+        padding-left: 10px;
+        margin-top: 25px;
+        margin-bottom: 12px;
+        page-break-after: avoid;
     }
-  }
-  
-  // 4. Obtener Productos e Inventarios (Calculando consolidados de ventas)
-  var hojaProd = ss.getSheetByName("productos");
-  var dProd = hojaProd.getDataRange().getValues();
-  var productos = [];
-  for(var i=1; i<dProd.length; i++) {
-    if(dProd[i][0] == idUsuario) {
-      var prodNombre = dProd[i][1];
-      var vendidos = 0;
-      ventas.forEach(function(v) { if(v.producto === prodNombre) vendidos += v.cantidad; });
-      
-      productos.push({ nombre: prodNombre, stockInicial: Number(dProd[i][2]), precio: Number(dProd[i][3]), vendidos: vendidos });
+    h3 {
+        font-size: 11pt;
+        color: #24292f;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        page-break-after: avoid;
     }
-  }
-  
-  // 5. Obtener Objetivos OKRs
-  var hojaObj = ss.getSheetByName("objetivos");
-  var dObj = hojaObj.getDataRange().getValues();
-  var objetivos = [];
-  for(var i=1; i<dObj.length; i++) {
-    if(dObj[i][0] == idUsuario) {
-      objetivos.push({ id: dObj[i][1], objetivo: dObj[i][2], descripcion: dObj[i][3], meta: Number(dObj[i][4]), actual: Number(dObj[i][5]) });
+    p {
+        margin-top: 0;
+        margin-bottom: 12px;
+        text-align: justify;
     }
-  }
-  
-  // 6. Obtener Token de Mistral AI
-  var hojaCfg = ss.getSheetByName("configuracion");
-  var dCfg = hojaCfg.getDataRange().getValues();
-  var mistralKey = "";
-  for(var i=1; i<dCfg.length; i++) {
-    if(dCfg[i][0] == idUsuario) { mistralKey = dCfg[i][1]; break; }
-  }
-  
-  return { organizacion: organizacion, ventas: ventas, productos: productos, vendedores: vendedores, objetivos: objetivos, mistralKey: mistralKey };
-}
-
-function guardarOrganizacion(idUsuario, orgData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("organizacion");
-  var datos = hoja.getDataRange().getValues();
-  var filaDestino = -1;
-  
-  for (var i = 1; i < datos.length; i++) {
-    if (datos[i][0] == idUsuario) { filaDestino = i + 1; break; }
-  }
-  
-  var filaValores = [
-    idUsuario, orgData.nombreEmpresa, orgData.nit, orgData.tamaño, orgData.sector,
-    orgData.dofa.f, orgData.dofa.o, orgData.dofa.d, orgData.dofa.a,
-    orgData.pestel.pe, orgData.pestel.ec, orgData.pestel.so, orgData.pestel.te, orgData.pestel.eco, orgData.pestel.le
-  ];
-  
-  if (filaDestino !== -1) {
-    hoja.getRange(filaDestino, 1, 1, filaValores.length).setValues([filaValores]);
-  } else {
-    hoja.appendRow(filaValores);
-  }
-  return { nombreEmpresa: orgData.nombreEmpresa };
-}
-
-function crearProducto(idUsuario, prod) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("productos");
-  hoja.appendRow([idUsuario, prod.nombre, prod.stockInicial, prod.precio]);
-  return { success: true };
-}
-
-function crearVendedor(idUsuario, vend) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("vendedores");
-  hoja.appendRow([idUsuario, vend.nombre, vend.zona]);
-  return { success: true };
-}
-
-function registrarVenta(idUsuario, venta) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("ventas");
-  var idVenta = "V-" + Utilities.getUuid().substring(0,8).toUpperCase();
-  hoja.appendRow([idUsuario, idVenta, venta.fecha, venta.producto, venta.cantidad, venta.monto, venta.vendedor, venta.ubicacion]);
-  return { idVenta: idVenta };
-}
-
-function guardarObjetivo(idUsuario, obj) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("objetivos");
-  var idObjetivo = "OKR-" + Utilities.getUuid().substring(0,5).toUpperCase();
-  hoja.appendRow([idUsuario, idObjetivo, obj.objetivo, obj.descripcion, obj.meta, obj.actual]);
-  return { idObjetivo: idObjetivo };
-}
-
-function actualizarAvanceOKR(idUsuario, idObjetivo, nuevoActual) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("objetivos");
-  var datos = hoja.getDataRange().getValues();
-  
-  for (var i = 1; i < datos.length; i++) {
-    if (datos[i][0] == idUsuario && datos[i][1] == idObjetivo) {
-      hoja.getRange(i + 1, 6).setValue(nuevoActual); // Columna F (Actual)
-      break;
+    ol, ul {
+        margin-top: 0;
+        margin-bottom: 15px;
+        padding-left: 20px;
     }
-  }
-  return { idObjetivo: idObjetivo, nuevoActual: nuevoActual };
-}
+    li {
+        margin-bottom: 6px;
+    }
+    .code-box {
+        background-color: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 12px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 8.5pt;
+        color: #24292f;
+        margin-bottom: 15px;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    .badge {
+        background-color: #ddf4ff;
+        color: #0969da;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 8.5pt;
+        font-family: monospace;
+        font-weight: bold;
+    }
+    .alert-box {
+        background-color: #fff8c5;
+        border-left: 4px solid #d4a72c;
+        padding: 12px;
+        margin-bottom: 15px;
+        border-radius: 0 6px 6px 0;
+    }
+    .alert-box strong {
+        color: #9a6700;
+    }
+</style>
+</head>
+<body>
 
-function guardarConfig(idUsuario, mistralKey) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var hoja = ss.getSheetByName("configuracion");
-  var datos = hoja.getDataRange().getValues();
-  var filaDestino = -1;
-  
-  for (var i = 1; i < datos.length; i++) {
-    if (datos[i][0] == idUsuario) { filaDestino = i + 1; break; }
-  }
-  
-  if (filaDestino !== -1) {
-    hoja.getRange(filaDestino, 2).setValue(mistralKey);
-  } else {
-    hoja.appendRow([idUsuario, mistralKey]);
-  }
-  return { success: true };
-}
+<div class="header-banner">
+    <h1>Guía de Despliegue: DataPulse Suite Pro en GitHub Pages</h1>
+    <p>Manual paso a paso para publicar el Frontend y conectarlo al Backend de Google Apps Script</p>
+</div>
+
+<p>Para convertir tu archivo de interfaz visual (<span class="badge">Recrear.html</span>) en una página web real y accesible desde cualquier dispositivo, utilizaremos <strong>GitHub Pages</strong>. Este servicio de hosting gratuito de GitHub nos permitirá publicar tu aplicación de forma segura en cuestión de minutos.</p>
+
+<h2>Paso 1: Preparar tu archivo HTML</h2>
+<p>GitHub Pages busca por defecto un archivo maestro llamado <span class="badge">index.html</span> en la raíz del repositorio para cargar la página web de inmediato. Sigue estas instrucciones preliminares:</p>
+<ol>
+    <li>Ubica el archivo <span class="badge">Recrear.html</span> que descargaste o guardaste de tu plataforma de clases.</li>
+    <li>Haz clic derecho sobre él y selecciona <strong>Cambiar nombre (Rename)</strong>.</li>
+    <li>Modifica el nombre completo a: <span class="badge">index.html</span> (asegúrate de que todo esté en minúsculas).</li>
+</ol>
+
+<h2>Paso 2: Crear una cuenta y un repositorio en GitHub</h2>
+<p>Si no cuentas con un perfil activo en GitHub, los pasos de configuración inicial son los siguientes:</p>
+<ol>
+    <li>Ingresa a la plataforma oficial <a href="https://github.com" style="color: #0969da; text-decoration: none;"><strong>github.com</strong></a> y crea una cuenta gratuita si aún no dispones de una.</li>
+    <li>Inicia sesión en tu panel principal y localiza el botón verde <strong>"New"</strong> (Nuevo) situado en la esquina superior izquierda (o haz clic en el ícono "+" arriba a la derecha y selecciona <em>New repository</em>).</li>
+    <li>Configura tu nuevo repositorio con los siguientes parámetros obligatorios:
+        <ul>
+            <li><strong>Repository name:</strong> Escribe un nombre descriptivo sin espacios, por ejemplo: <span class="badge">datapulse-suite</span> o <span class="badge">sumerce-alimentos</span>.</li>
+            <li><strong>Public/Private:</strong> Selecciona obligatoriamente la opción <strong>Public</strong>. GitHub Pages requiere que el repositorio sea público en cuentas gratuitas para poder publicar la web.</li>
+            <li><strong>Initialize this repository with:</strong> Marca la casilla que dice <strong>Add a README file</strong>. Esto creará el repositorio de inmediato con una estructura base editable.</li>
+        </ul>
+    </li>
+    <li>Desplázate hasta el final de la pantalla y haz clic en el botón verde <strong>"Create repository"</strong>.</li>
+</ol>
+
+<h2>Paso 3: Subir tu archivo index.html a GitHub</h2>
+<p>Una vez dentro de la interfaz gráfica de tu nuevo repositorio, realiza el proceso de carga sin necesidad de instalar herramientas de consola complejos:</p>
+<ol>
+    <li>En el menú superior derecho de la caja de archivos, haz clic en el menú desplegable <strong>Add file</strong> y selecciona la opción <strong>Upload files</strong> (Subir archivos).</li>
+    <li>Arrastra el archivo <span class="badge">index.html</span> desde la carpeta de tu computadora directamente al recuadro de la página, o presiona <em>"choose your files"</em> para buscarlo manualmente.</li>
+    <li>Espera a que la barra de carga finalice por completo y aparezca el nombre del archivo en la lista.</li>
+    <li>En la parte inferior de la interfaz, ubica la sección de confirmación, escribe un título breve opcional (por ejemplo: <span class="badge">Subida inicial de interfaz</span>) y presiona el botón verde <strong>"Commit changes"</strong>.</li>
+</ol>
+
+<div class="alert-box">
+    <strong>⚠️ NOTA DE SEGURIDAD CRÍTICA:</strong> El archivo que acabas de subir es 100% público. Asegúrate de que el código HTML <strong>no contenga contraseñas fijas escritas explícitamente</strong> ni tokens privados expuestos antes de subirlo. El sistema te pedirá esas credenciales de forma interactiva en la pantalla de inicio de sesión cuando cargue la web.
+</div>
+
+<h2>Paso 4: Activar GitHub Pages para publicar la web</h2>
+<p>Con el archivo cargado en el repositorio, solo resta encender los servidores de hosting estático de GitHub:</p>
+<ol>
+    <li>Haz clic en la pestaña <strong>Settings</strong> (Configuración), identificada con el ícono de un engranaje en el menú superior del repositorio.</li>
+    <li>En la barra lateral izquierda, navega hacia abajo hasta la sección de <strong>Code and automation</strong> y haz clic en la opción <strong>Pages</strong>.</li>
+    <li>En el apartado central titulado <strong>Build and deployment</strong>, localiza la sección de <em>Source</em> (debe decir "Deploy from a branch").</li>
+    <li>Bajo el menú desplegable de <strong>Branch</strong>, cambia el valor que dice <span class="badge">None</span> por la rama principal, habitualmente llamada <strong>main</strong> o <strong>master</strong>. Deja la carpeta contigua en <span class="badge">/ (root)</span>.</li>
+    <li>Haz clic en el botón <strong>Save</strong> (Guardar).</li>
+</ol>
+
+<h2>Paso 5: Probar y Conectar la aplicación</h2>
+<p>GitHub tardará entre 30 segundos y 2 minutos en procesar la página en segundo plano.</p>
+<ol>
+    <li>Refresca la pestaña actual de <em>Settings > Pages</em>. En la parte superior aparecerá un recuadro verde con un mensaje similar a: <strong>"Your site is live at..."</strong> seguido de un enlace web público.</li>
+    <li>Haz clic en ese enlace. Se abrirá la interfaz de login de tu <strong>DataPulse Suite Pro</strong> ejecutándose en la nube.</li>
+    <li><strong>Procedimiento de Conexión:</strong>
+        <ul>
+            <li>En la casilla de <strong>API URL / Web App URL</strong>, pega el enlace largo que te generó Google Apps Script (el que empieza con <em>https://script.google.com/macros/s/...</em>).</li>
+            <li>En el campo de <strong>Usuario ID</strong> ingresa un identificador único tuyo (ej. <span class="badge">ESTUDIANTE2026</span>).</li>
+            <li>En el campo de <strong>Correo</strong> digita tu correo de registro.</li>
+            <li>Haz clic en <strong>Iniciar Sesión</strong>. ¡La página web de GitHub guardará los datos en tu Google Sheet automáticamente de forma remota!</li>
+        </ul>
+    </li>
+</ol>
+
+</body>
+</html>
+"""
+
+output_pdf = "Manual_Despliegue_GitHub_Pages.pdf"
+HTML(string=html_content).write_pdf(output_pdf)
+print(f"PDF successfully generated: {output_pdf}")
